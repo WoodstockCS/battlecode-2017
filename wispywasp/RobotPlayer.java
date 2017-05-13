@@ -2,21 +2,30 @@ package wispywasp;
 import battlecode.common.*;
 
 public strictfp class RobotPlayer {
-
-   // START declare instance variables
+  // START declare instance variables
    static RobotController rc;
+   static Direction NORTHWEST;
+   static Direction SOUTHWEST;
+   static Direction NORTHEAST;
+   static Direction SOUTHEAST;
    static Direction gDir;
-   
+   static Direction sDir;
+   static Team enemy;
    // END
 
    @SuppressWarnings("unused")
    public static void run(RobotController rc) throws GameActionException {
-   
-      // START initialize instance variables
-      RobotPlayer.rc = rc;  
-      
+     // START initialize instance variables
+      RobotPlayer.rc = rc;   
+      NORTHWEST = new Direction((float)Math.PI * 3/4);
+      SOUTHWEST = new Direction((float)Math.PI * -3/4);
+      NORTHEAST = SOUTHWEST.opposite();
+      SOUTHEAST = NORTHWEST.opposite();
+      gDir = NORTHEAST;
+      sDir = SOUTHEAST;
+      enemy = rc.getTeam().opponent();
       // END
-         
+                  
       switch (rc.getType()) {
          case ARCHON:
             runArchon();
@@ -29,71 +38,87 @@ public strictfp class RobotPlayer {
             break;
       }
    }
-   
+
    static void runArchon() throws GameActionException {
       while (true) {
          try {
+            // START declare (& initialize?) local variables
             Direction dir = randomDirection();
-            if (rc.canHireGardener(dir) && Math.random() < .1) {
+            //END
+            if (rc.canHireGardener(dir) && Math.random() < .5) {
                rc.hireGardener(dir);
             }
-            Direction northWest = new Direction((float)Math.PI * 3/4);
-            tryMove(northWest);
-            Clock.yield();    
-         }
+            tryMove(randomDirection());
+            Clock.yield();     
+         } 
          catch (Exception e) {
             System.out.println("Archon Exception");
             e.printStackTrace();
          }
       }
    }
-   
+
    static void runGardener() throws GameActionException {
       while (true) {
          try {
+            // START declare (& initialize?) local variables
             RobotInfo[] friends = rc.senseNearbyRobots(-1, rc.getTeam());
+            Direction away;
+            // END
             for (int i = 0; i < friends.length; i++) {
                if (friends[i].getType() == RobotType.ARCHON) {
-                  Direction away = rc.getLocation().directionTo(friends[i].getLocation()).opposite();
+                  away = rc.getLocation().directionTo(friends[i].getLocation()).opposite();
                   tryMove(away);
                }
             }
-            if (gDir == null){
-               gDir = new Direction((float)Math.PI -3 / 4);
-            }
+
             if (rc.canMove(gDir)) {
                tryMove(gDir);
-            } else {
+            } 
+            else {
                gDir = gDir.opposite();
-            }   
-            Direction dir = randomDirection();
-            if (rc.canBuildRobot(RobotType.SOLDIER, dir) && Math.random() < .3) {
-               rc.buildRobot(RobotType.SOLDIER, dir);
             }
-            Clock.yield();    
-         }
+         
+            if (rc.canBuildRobot(RobotType.SOLDIER, SOUTHEAST) && Math.random() < .9) {
+               rc.buildRobot(RobotType.SOLDIER, SOUTHEAST);
+            }
+            Clock.yield();     
+         } 
          catch (Exception e) {
             System.out.println("Gardener Exception");
             e.printStackTrace();
          }
       }
    }
+
    static void runSoldier() throws GameActionException {
-      Team enemy = rc.getTeam().opponent();
+      
       while (true) {
          try {
+            // START declare (& initialize?) local variables
             MapLocation myLocation = rc.getLocation();
             RobotInfo[] robots = rc.senseNearbyRobots(-1, enemy);
+            // END
             if (robots.length > 0) {
-               if (rc.canFireSingleShot()) {
-                  rc.fireSingleShot(rc.getLocation().directionTo(robots[0].location));
+               if (rc.canFireTriadShot()) {
+                  rc.fireTriadShot(rc.getLocation().directionTo(robots[0].location));
                }
-            } else {
-               Direction myDir = new Direction((float)Math.PI / -4);
-               if (rc.canMove(myDir)) tryMove(myDir);
+            } 
+            else {
+               if (rc.canMove(sDir)) {
+                  tryMove(sDir);
+               } 
+               else if (Math.random() < 0.5) {
+                  sDir = sDir.rotateLeftDegrees(90 + (float)Math.random() * 10);
+                  tryMove(sDir);
+               } 
+               else {
+                  sDir = sDir.rotateRightDegrees(90 + (float)Math.random() * 10);
+                  tryMove(sDir);
+               }
             }
             Clock.yield();
-         }
+         } 
          catch (Exception e) {
             System.out.println("Soldier Exception");
             e.printStackTrace();
@@ -108,6 +133,7 @@ public strictfp class RobotPlayer {
    static Direction randomDirection() {
       return new Direction((float)Math.random() * 2 * (float)Math.PI);
    }
+
    /**
     * Attempts to move in a given direction, while avoiding small obstacles directly in the path.
     *
@@ -118,6 +144,7 @@ public strictfp class RobotPlayer {
    static boolean tryMove(Direction dir) throws GameActionException {
       return tryMove(dir,20,3);
    }
+
    /**
     * Attempts to move in a given direction, while avoiding small obstacles direction in the path.
     *
